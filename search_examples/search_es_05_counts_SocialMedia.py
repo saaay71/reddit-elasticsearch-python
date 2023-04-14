@@ -17,8 +17,7 @@ end_date = datetime(2015, 2, 1)
 timestmap_field = "@timestamp"
 search_field = "body" # name of the field we want to do the searching
 
-def get_number_of_occurance(search_string):
-    # Build the query
+def get_number_of_occurance(search_string, search_type=""):
     query = {
         "bool": {
           "must": [
@@ -41,6 +40,84 @@ def get_number_of_occurance(search_string):
           ]
         }
     }
+    if search_type == "AND":
+        terms = search_string.split(" ")
+        query = {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            timestmap_field: {
+                                "gte": start_date,
+                                "lte": end_date,
+                                # "boost": 2
+                            }
+                        }
+                    },
+                    {
+                        "bool": {
+                            "must": [
+                                {"match": {search_field: terms[0]}},
+                                {"match": {search_field: terms[1]}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    elif search_type == "OR":
+        terms = search_string.split(" ")
+        query = {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            timestmap_field: {
+                                "gte": start_date,
+                                "lte": end_date,
+                                # "boost": 2
+                            }
+                        }
+                    },
+                    {
+                        "bool": {
+                            "should": [
+                                {"match": {search_field: terms[0]}},
+                                {"match": {search_field: terms[1]}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    elif search_type == "EXCLUDE":
+        terms = search_string.split(" ")
+        query = {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            timestmap_field: {
+                                "gte": start_date,
+                                "lte": end_date,
+                                # "boost": 2
+                            }
+                        }
+                    },
+                    {
+                        "bool": {
+                            "must": [
+                                {"match": {search_field: terms[0]}}
+                            ],
+                            "must_not": [
+                                {"match": {search_field: terms[1]}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+
 
     # # Search the index using count API
     # query_response = es.count(index=index_name, q=search_field+":"+search_string)
@@ -55,22 +132,36 @@ def get_number_of_occurance(search_string):
     return query_response["hits"]["total"]["value"]
 
 
+
+
 websites = []
 with open("social_websites.txt", "r", encoding="utf-8") as f:
     websites =  f.readlines()
 websites = [w.strip() for w in websites]
 
+for i in range(len(websites)):
+    q = "\""+websites[i]+"\""
+    query_count = get_number_of_occurance(q)
+    print(q, ": ", query_count)
+
 websites_comb = list(combinations(websites, 2))
 
-queries = []
-queries += ["\""+w+"\"" for w in websites] # website alone
-queries += ["\""+w[0]+"\" \""+w[1]+"\"" for w in websites_comb] # websites together
-queries += ["\""+w[0]+"\" -\""+w[1]+"\"" for w in websites_comb] # first website excluding seconding website
-queries += ["\""+w[1]+"\" -\""+w[0]+"\"" for w in websites_comb] # second website exclusing first website
+for i in range(len(websites_comb)):
+    q = "\""+websites_comb[i][0]+"\" \""+websites_comb[i][1]+"\""
+    query_count = get_number_of_occurance(q, "AND")
+    print(q + " AND", ": ", query_count)
 
-print("Total number of queries: %d" % len(queries))
+for i in range(len(websites_comb)):
+    q = "\""+websites_comb[i][0]+"\" \""+websites_comb[i][1]+"\""
+    query_count = get_number_of_occurance(q, "OR")
+    print(q + " OR", ": ", query_count)
 
-# Make request to ES and get the number of occurances
-for i in range(len(queries)):
-    query_count = get_number_of_occurance(queries[i])
-    print(queries[i], ": ", query_count)
+for i in range(len(websites_comb)):
+    q = "\""+websites_comb[i][0]+"\" \""+websites_comb[i][1]+"\""
+    query_count = get_number_of_occurance(q, "EXCLUDE")
+    print(q + " EXCLUDE", ": ", query_count)
+
+for i in range(len(websites_comb)):
+    q = "\""+websites_comb[i][1]+"\" \""+websites_comb[i][0]+"\""
+    query_count = get_number_of_occurance(q, "EXCLUDE")
+    print(q + " EXCLUDE", ": ", query_count)
