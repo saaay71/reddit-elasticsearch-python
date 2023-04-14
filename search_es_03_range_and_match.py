@@ -15,6 +15,8 @@ end_date = datetime(2015, 2, 1)
 search_string = "youtube facebook"
 
 timestmap_field = "@timestamp"
+search_field = "body" # name of the field we want to do the searching
+
 # Build the query
 query = {
     "bool": {
@@ -30,7 +32,7 @@ query = {
         },
         {
           "match": {
-            "body": {
+            search_field: {
               "query": search_string
             }
           }
